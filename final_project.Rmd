@@ -1,0 +1,375 @@
+---
+title: "Main Influences of Students' Dropout Rate"
+author: "Yashas Chandrasekharan,
+         Coco Wang,
+         Monica Park,
+         Ariana Talai,
+         Connie Chiang"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+---
+
+## Introduction
+
+```{r setup, include=FALSE}
+# control global Rmd chunk settings
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
+```
+Student dropout rates are a significant concern in higher educational institutions worldwide, impacting not only the individual’s academic and professional trajectory but also broader societal and economic outcomes. Understanding the factors contributing to dropout rates is crucial for developing effective interventions.
+
+In the United States alone, 40% of college students drop out of school before ever obtaining their degree. [^1] Though this 40% chance of dropping out of school does not effect all students equally. Students experience a wide variety of hurdles in life that effects students and their ability to continue school in a diverse range of ways. With students all being greatly unique in their background and past experience, this leads to the possibility of there being a large spectrum of factors that shape students' actions, underlying attitude, and performance in school prior to dropping out and consequently impact their decision for ultimately dropping out.
+
+Thus, this study aims to identify the key aspects of a student's circumstances—such as demographics, economic factors, academic performance, social and special needs, and macroeconomic conditions—that can accurately predict dropout behavior from higher educational institutions, such as undergraduate programs. To elaborate further on these social, academic, and economic barriers students face: social factors refers to a student's age, gender, marital status, and nationality, academic factors regards a student's academic performance in school, and economic barriers refers to financial challenges such as tuition, housing, and school supplies.
+
+
+By analyzing these social, academic, and economic obstacles that stands in the way of students from reaching graduation, we seek to uncover actionable insights to reduce dropout rates, improve student retention, and enhance the overall effectiveness of educational systems. It is important to address these issues because of the vital benefits a college degree provides people post-graduation. With college dropouts making a 35% decrease in income compared to college graduates with bachelor's degrees and with college dropouts being 20% more likely to be unemployed compared to any person with a degree, it's imperative that the results of this study to be used and applied to the college dropout crisis in order to nullify these statistics. [^2] Thus, through identifying the main hurdles of a student's life circumstances that effects their ability from becoming a degree holder, higher educational institutions will be able to respond accordingly in order to completely eradicate this college dropout crisis and help streamline students' future path to success.
+
+[^1]: https://mainstay.com/blog/the-college-dropout-scandal-and-the-innovation-gap/
+[^2]: https://educationdata.org/college-dropout-rates
+
+## Question
+
+What aspect of a student's circumstance (demographic analysis, economic factors, academic performance, social and special needs, or macro-economic factors) can best accurately predict whether they drop out of a higher education institution?
+
+
+### Load packages
+```{r load-packages, message=FALSE}
+library(tidyverse)
+library(tidymodels)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(reshape2)
+library(randomForest)
+library(caret)
+```
+
+
+## The Data
+
+We used the dataset ["Predict students' dropout and academic success"](https://www.kaggle.com/datasets/thedevastator/higher-education-predictors-of-student-retention), sourced from Kaggle and contributed by thedevastator.
+
+This dataset contains data for students in higher education. It contains multiple disjoint databases that include demographic data, socioeconomic factors, academic performance, and other relevant information at the time of data collection (age at enrollment, application mode, etc.). To get a better uderstanding of the variables, a table is included below describing the variables:
+
+| Variable Feature | Explanation | 
+|:-----|------:|
+| **Marital Status**   | The marital status of the student. |  
+| **Application mode**   |  The method of application used by the student.  |  
+| **Application order**   |  The order in which the student applied |  
+| **Course**   |  The course taken by the student | 
+| **Daytime/evening attendance**   |  Whether the student attends classes during the day or in the evening | 
+| **Previous qualification**   |  The qualification obtained by the student before enrolling in higher education | 
+| **Nacionality**  |  The nationality of the student | 
+| **Mother's qualification**   |  The qualification of the student's mother | 
+| **Father's qualification**   |  The qualification of the student's father | 
+| **Mother's occupation**   |  The occupation of the student's mother | 
+| **Father's occupation**   |  The occupation of the student's father |
+| **Displaced**   |  Whether the student is a displaced person |
+| **Educational special needs**   |  Whether the student has any special educational needs |
+| **Debtor**   |  Whether the student is a debtor |
+| **Tuition fees up to date**   |  Whether the student's tuition fees are up to date |
+| **Gender**   |  The gender of the student |
+| **Scholarship holder**   |  Whether the student is a scholarship holder |
+| **Age at enrollment**   |  The age of the student at the time of enrollment |
+| **International**   |  Whether the student is an international student |
+| **Curricular units 1st sem (credited)**   |  The number of curricular units credited by the student in the first semester |
+| **Curricular units 1st sem (enrolled)**   |  The number of curricular units enrolled by the student in the first semester |
+| **Curricular units 1st sem (evaluations)**   |  The number of curricular units evaluated by the student in the first semester |
+| **Curricular units 1st sem (approved)**   |  The number of curricular units approved by the student in the first semester |
+| ***Curricular units 1st sem (grade)**   |  The number of curricular units graded by the student in the first semester |
+| **Curricular Units 1st Sem (without Evaluations)**   |  The number of curricular units without evaluations by the student in the first semester |
+| **Curricular units 2nd sem (credited)**   |  The number of curricular units credited by the student in the second semester |
+| **Curricular units 2nd sem (enrolled)**   |  The number of curricular units enrolled by the student in the second semester |
+| **Curricular units 2nd sem (evaluations)**   |  The number of curricular units evaluated by the student in the first semester |
+| **Curricular units 2nd sem (approved)**   |  The number of curricular units approved by the student in the second semester |
+| **Curricular units 2nd sem (grade)**   |  The number of curricular units graded by the student in the first semester |
+| **Curricular Units 2nd Sem (without Evaluations)**   |  The number of curricular units without evaluations by the student in the first semester |
+| **Unemployment Rate**   |  Whether the student is an international student |
+| **Inflation Rate**   |  The inflation rate at the time of the student's enrollment |
+| **GDP**   |  The GDP at the time of the student's enrollment |
+| **Target**   |  Whether the student dropped out, graduated, or is currently enrolled in school |
+
+
+
+### Data Import
+
+We first read in the data:
+```{r}
+dropout_data <- read_csv("data/dataset.csv")
+
+glimpse(dropout_data)
+```
+
+### Data Wrangling
+
+Then we reformat the variable names to have simpler, more concise names, while checking for any null values:
+```{r mutate-data-structure}
+# rename columns and fix typos
+colnames(dropout_data) <- c(
+  "marital_status", "application_mode", "application_order", "course",
+  "attendance", "previous_qualification", "nationality", "mother_qualification",
+  "father_qualification", "mother_occupation", "father_occupation", "displaced",
+  "special_needs", "debtor", "tuition_up_to_date", "gender", "scholarship_holder",
+  "age_at_enrollment", "international", "curricular_1st_credited",
+  "curricular_1st_enrolled", "curricular_1st_evaluations", "curricular_1st_approved",
+  "curricular_1st_grade", "curricular_1st_without_evaluations", "curricular_2nd_credited",
+  "curricular_2nd_enrolled", "curricular_2nd_evaluations", "curricular_2nd_approved",
+  "curricular_2nd_grade", "curricular_2nd_without_evaluations", "unemployment_rate",
+  "inflation_rate", "gdp", "target"
+)
+
+# check for na values
+colSums(is.na(dropout_data))
+    # none found
+```
+
+We do not find any null values in the dataset, which is great! We then plot a correlation heatmap to help guide our data filtering process, taking care to examine high correlational values and low correlational values:
+```{r corr-map}
+# Convert the "Target" column to a numeric representation for correlation
+dropout_data <- dropout_data |>
+  mutate(target_numeric = case_when(
+    target == "Dropout" ~ 1,
+    target == "Enrolled" ~ 2,
+    target == "Graduate" ~ 3,
+    TRUE ~ NA_real_  # Add NA for any unexpected values
+  ))
+
+# Select only numeric columns for correlation, including the target variable
+numeric_data <- select(dropout_data, where(is.numeric))
+
+# Calculate the correlation matrix
+cor_matrix <- cor(numeric_data, use = "complete.obs", method = "pearson")
+
+# Melt the correlation matrix for ggplot2
+melted_cor <- melt(cor_matrix)
+
+# Plot the heatmap
+ggplot(melted_cor, aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0, name = "Correlation") +
+  theme_minimal() +
+  labs(x = "Variables", y = "Variables", title = "Correlation Heatmap") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 4),
+    axis.text.y = element_text(size = 6)) +
+  coord_fixed()  # Ensures the axes are proportional
+
+target_corr <- cor_matrix["target_numeric", ]
+print(target_corr)
+```
+
+Examining the target_numeric row, we aim to see if any variables immediately stand out and make note of them. Among them, many of the 'curricular' variables have high correlation scores.
+
+We then filter out any variables with correlation values with less than an absolute difference of 0.1:
+```{r filter-corr}
+target_corr_filtered <- target_corr[abs(target_corr) > 0.1]
+
+# Print the filtered correlations
+print(target_corr_filtered)
+```
+```{r copy-cut-data}
+columns_to_include <- names(target_corr_filtered)
+
+new_data <- dropout_data[, columns_to_include]
+
+glimpse(new_data)
+```
+
+Finally, we convert selected columns into factors to facilitate exploratory data analysis. This ensures that categorical data is  properly formatted for numerical analysis.
+```{r filter-and-factor}
+# use 'data' for EDA, use 'new_data' for analysis
+data <- new_data
+
+data$application_mode <- factor(data$application_mode, 
+                                 levels = 1:18, 
+                                 labels = c("1st phase—general contingent", 
+                                            "Ordinance No. 612/93", 
+                                            "1st phase—special contingent (Azores Island)", 
+                                            "Holders of other higher courses", 
+                                            "Ordinance No. 854-B/99", 
+                                            "International student (bachelor)", 
+                                            "1st phase—special contingent (Madeira Island)", 
+                                            "2nd phase—general contingent", 
+                                            "3rd phase—general contingent", 
+                                            "Ordinance No. 533-A/99, item b2) (Different Plan)", 
+                                            "Ordinance No. 533-A/99, item b3 (Other Institution)", 
+                                            "Over 23 years old", 
+                                            "Transfer", 
+                                            "Change in course", 
+                                            "Technological specialization diploma holders", 
+                                            "Change in institution/course", 
+                                            "Short cycle diploma holders", 
+                                            "Change in institution/course (International)"))
+
+data$gender <- factor(data$gender, levels = c(0, 1), labels = c("Female", "Male"))
+
+data$scholarship_holder <- factor(data$scholarship_holder, levels = c(0, 1), labels = c("No", "Yes"))
+
+data$tuition_up_to_date <- factor(data$tuition_up_to_date, levels = c(0, 1), labels = c("No", "Yes"))
+
+data$debtor <- factor(data$debtor, levels = c(0, 1), labels = c("No", "Yes"))
+
+data$displaced <- factor(data$displaced, levels = c(0,1), labels = c("No", "Yes"))
+```
+
+
+## Exploratory Data Analysis
+
+We begin our EDA by analysing how many dropouts, enrolled students, and graduates there are in our data in order to better understand the range of the types of students in our data:
+
+```{r plot-target-categories}
+# Count the number of each category in the 'Target_numeric' column
+target_numeric_counts <- table(data$target_numeric)
+
+# Create a data frame for ggplot
+target_numeric_df <- as.data.frame(target_numeric_counts)
+colnames(target_numeric_df) <- c("Category", "Count")
+target_numeric_df$Category <- factor(target_numeric_df$Category, levels = c(1, 2, 3), labels = c("Dropout", "Enrolled", "Graduate"))
+
+ggplot(data = target_numeric_df, aes(x = "", y = Count, fill = Category)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) +
+  labs(title = "Distribution of Students' Higher Education in our Dataset") +
+  theme_void() +
+  scale_fill_manual(values = c("coral", "forestgreen", "cadetblue")) +
+  theme(legend.title = element_blank()) + # Optional: remove the legend title
+  geom_text(aes(label = paste(Category, "\n", Count)), position = position_stack(vjust = 0.5), color = "white")
+```
+
+32.1% of students in our dataset dropped out (n=1421), 17.9% of students were enrolled in higher education (n=794), and the majority of students (49.9%) were graduated (n=2209).
+
+
+Next, to gain a sense of how are variables relate to a student's enrollment status, let's plot the top 10 features with the highest correlation to the target:
+
+```{r plot-top-10}
+# Sort the target_corr_filtered data by absolute correlation values and select the top 10
+top_10_features <- target_corr_filtered[order(abs(target_corr_filtered), decreasing = TRUE)][1:10]
+
+# Create a data frame for plotting
+top_10_df <- data.frame(
+  Feature = names(top_10_features),
+  Correlation = as.numeric(top_10_features)
+)
+
+# Remove underscores
+top_10_df$Feature <- gsub("_", " ", top_10_df$Feature)
+
+# Create the plot with conditional coloring
+ggplot(top_10_df, aes(x = reorder(Feature, Correlation), y = Correlation, fill = Feature == "target numeric")) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = c("steelblue", "red"), guide = "none") +
+  coord_flip() +
+  labs(title = "Top 10 Features with Highest Correlation to Student Graduation\n (in red)",
+       x = "Feature",
+       y = "Correlation") +
+  theme_minimal()
+
+```
+
+Student dropout is labelled in red (correlation=1.0) to serve as a point of reference for the strength of correlation of our most-correlated features. Note that student dropout was converted to a factor (1=dropout, 2=enrolled, 3=graduated) in such a way that greater values represent being closer to graduating, while values closer to 1 indicate dropout. Hence, a positive correlation would mean an increase in the feature correlates with graduating, while a negative correlation means an increase in the feature correlates with dropout. 
+
+In order from least to greatest correlation, these features are:
+
+* **curricular 2nd approved:** The number of curricular units approved by the student in the second semester.
+* **curricular 2nd grade:** Curricular units (grade points) of the student in the second semester.
+* **curricular 1st approved:** The number of curricular units approved by the student in the first semester.
+* **curricular 1st grade:** Curricular units (grade points) of the student in the first semester.
+* **tuition up to date**: Whether the student's tuition fees are up to date. (0=no, 1=yes)
+* **scholarship holder**: Whether the student is a scholarship holder. (0=no, 1=yes)
+* **gender**: The gender of the student. (0=female, 1=male; ie with these factors, gender having a negative correlation with graduation indicates that females tend to have a higher graduation rate than males)
+* **debtor**: Whether the student is a debtor. (0=no, 1=yes)
+* **age at enrollment**: The age of the student at the time of enrollment.
+
+Lastly, we plot the distribution of the age of students at the time of enrollment, given it has the strongest negative correlation to target_numeric:
+
+```{r plot-age-enroll}
+ggplot(data = data, aes(x = age_at_enrollment)) +
+  geom_histogram(bins = 25, fill = "skyblue", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of Age at the Time of Enrollment",
+       x = "Age at Enrollment",
+       y = "Frequency") +
+  theme_minimal()
+```
+
+This positively skewed graph shows that most students enroll before the age of 40, with the largest number of students enrolling at age 20, 19, and 21 respectively. While these ages are close to the traditional time of enrollment for most students around the globe, we note that there is a non-negligible portion of students that still enroll far into their 30s and even their 40s in our dataset. With this overview of our data, we then moved onto our analysis portion where we built models to utilize these features to predict students' higher education status.
+
+## Analysis
+
+For the analysis, we first split our dataset intro training and test data for validation purposes.
+explain why and how we are doing our train/test split.
+
+```{r split-data}
+set.seed(123)  # For reproducibility
+
+new_data$target_numeric <- as.factor(new_data$target_numeric)
+
+# Split data into training and testing sets (80% train, 20% test)
+train_index <- createDataPartition(new_data$target_numeric, p = 0.8, list = FALSE)
+train_data <- new_data[train_index, ]
+test_data <- new_data[-train_index, ]
+```
+
+Next, we built a random forest model to **classify students into drop out, enrolled, and graduated labels.** This random forest model functions by building multiple decision trees and combines their outputs to make a final prediction, and suits our specific use case given the nature of our research question. The predictions of this model on the training data (i.e. the data used to build the model) are shown below:
+
+```{r fit-data}
+rf_model <- randomForest(target_numeric ~ ., data = train_data, ntree = 100, mtry = 3, importance = TRUE)
+print(rf_model)
+```
+
+The output demonstrates that the random forest model has **100 decision trees**, which each use **3 randomly selected predictors**. **This model was able to predict our target variable (categorical label of drop out, enrolled, or graduate) with an error rate of 23.9%.** 
+  More specifically, the confusion matrix demonstrates the breakdown of these predictions. *Drop-out (group 1) was predicted with 74.6% accuracy* (25.4% error). Students who dropped out were mislabeled as enrolled 9.5% of the time (n=108) and graduated 15.9% of the time (n=181). *Enrolled status (group 2) was predicted with 35.8% accuracy* (64.2% error). Students who were enrolled were mislabeled a drop-out 12.9% of the time (n=147) and graduated 23.0% of the time (n=261). Lastly, *graduated status (group 3) was predicted with a surprising 91.52% accuracy* (8.48% error). Students who graduated were mislabeled as a drop-out only 5.0% of the time (n=57) and enrolled 8.2% of the time (n=93)! 
+  
+**These results show that our random forest model (ntree=100, mtry=3) has great accuracy in predicting whether or not a student is graduated, and has fairly good accuracy in predicting whether or not a student has dropped out.**
+
+While it is nice to build a model on a dataset and see if it works for the data from which the model was built, it is crucial that we can generalize this model to unseen data as well. To validate whether or not this model can generalize to unseen data, we then predicted students' higher education status (drop out, enrolled, or graduated) on the unseen, *test* portion of our dataset. The results are shown below:
+
+```{r eval-performance}
+predictions <- predict(rf_model, test_data)
+confusionMatrix(predictions, test_data$target_numeric)
+```
+
+To give a brief summary of the output, **The model had an overall 78% accuracy across all predictions** (n=234, 53, and 399 correct classification for groups 'drop-out', 'enrolled', and 'graduated' respectively), which falls within the 95% confidence interval. The *P-Value [Acc > NIR]* slot also confirms that these predictions are statistically significant (p<2.2e-16), outperforming the baseline no information rate (NIR) of 49.94%.
+
+Some other metrics we want to highlight are sensitivity and specificity. In our context, sensitivity measures how accurately the model correctly identifies a student's education status. For example, **in students who drop out, sensitivity measures the proportion of students who have been labelled as 'dropped out' out of all students who actually dropped out. Conversely, specificity would measure how accurately students who are not dropped out are not labelled as dropped out**, since specificity is a measure of a test's ability to identify true negatives. When validating our random forest model on the test data, we have high sensitivity to detecting drop out and graduated students (82.39% and 90.48% respectively), and high specificity in detecting drop out, enrolled and graduated students (90.82%, 92.83% and 79.64% respectively)!
+
+When sensitivity and specificity are treated with equal importance, we get the balanced error rates of 86.66% for classifying drop-out students, 63.19% for enrolled students, and 85.06% for graduated students. **Overall, the model is strong in classifying drop out or enrolled students, but has a little more trouble distinguishing enrolled students from the two other categories.**
+
+Next, we will evaluate the significance of the features used in the model. This allows us to identify the most important features of the Random Forest model's performance in classifying our label 'target_numeric', which indicated if a student was a dropout, enrolled, or a graduate. To do so, we use two metrics, Mean Decrease Accuracy and Mean Decrease Gini. Mean Decrease Accuracy measured how much overall model accuracy decreases when a feature is removed, and Mean Decrease Gini measured how effectively a feature contributed to reducing data impurity during tree splits. Together, these metrics provide complementary insights into the significance of each variable.
+
+```{r visualise-feature-performance}
+importance(rf_model)
+varImpPlot(rf_model)
+```
+
+Inspecting the feature importance output and accompanying plot, some key features that highly impact the model performance include:
+
+* The number of approved 2nd semester curricular units (MDA=39.11%, Gini=396.73), and all related curricular metrics
+* Having paid tuition up to date (MDA=34.56%, Gini=112.01)
+
+Some features with moderate impact on the model include:
+
+* Age at enrollment (MDA=12.09%, 158.35%)
+* Whether or not the student has a scholarship (MDA=9.58%, Gini=48.99)
+
+Features with the least impact on model performance are:
+
+* Whether the student is a displaced person (MDA=1.20%, Gini=39.83)
+* Gender (MDA=4.02%, Gini=41.92)
+
+
+## Results & Discussion
+
+The analysis reveals that academic-related features, such as the number of approved 1st and 2nd semester course credits (curricular_1st_approved, curricular_2nd_approved) and grades from both the first and second curricular years (curricular_1st_grade, curricular_2nd_grade), are the most influential features in predicting a student's higher education status. Notably, curricular_2nd_approved was the top predictor across both metrics, indicating its statistical power in correctly identifying a student's label in target_numeric. **This suggests that students' second-year curricular outcomes are critical for the model's decision-making process.**
+
+**On the other hand, demographic features like gender, debtor, and displaced contribute minimally,** as demonstrated by their low values in both Mean Decrease Accuracy and Mean Decrease Gini. Their limited importance aligns with the model's evaluation results, where overall accuracy is high, but Class 2 showed lower performance, potentially due to students of enrolled status being in an in-between 'grey' state of having potential to both graduate or dropout, depending on how their next semester goes. **In other words, this group's status may require additional data features over time that capture long term trends in academic or financial factors over time that can lead to the student ultimately graduating or dropping out of higher education.**
+
+We also want to note that while all features were treated independently, showing only main effects between variables, there is likely interaction between these variables that could be captured through a more complex model. For example, interaction of features like not being able to pay tuition and having a scholarship, or academic grade and approval, could explain variability not seen in the random forest model.
+
+Overall, our findings demonstrate that utilizing academic and enrollment-related variables to predict student academic status (drop out, enrolled, graduated) yield surprisingly accurate results, especially in identifying students who have dropped out or graduated.
+
+## Conclusion
+
+In conclusion, this study demonstrates that metrics of academic performance, particularly related to one's second-year of university, adds the most value in building an accurate model to predict higher education status. Demographic features like gender or displacement status had less of an effect on these predictions, though not to undermine the great impact that demographics can affect a student's academic career! The biggest downside to building a random forest model to classify students' enrollment status was a lack of sensitivity to identity those who are still enrolled; however, students who are dropped out and already graduated were identified with great accuracy. Of course, simply identifying what groups these students belong to is not the end goal of the study. Rather, we hope this exploration of the correlation and predictive powers of various features on student academic success can bring attention to the need to proactively observe students' academic progress as a means to gauge whether or not they will graduate. From a statistical standpoint, the lack of accuracy in identifying students with an 'enrolled' status may be disappointing, but in the real world, we hope that this finding simply points to a greater need for long term, in-depth studies surrounding these enrolled students to identify factors that can benefit or harm these students in inching towards the finish line.
